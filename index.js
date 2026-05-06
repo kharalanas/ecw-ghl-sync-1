@@ -1,6 +1,6 @@
 const express = require("express");
 const axios = require("axios");
-const { importJWK, exportPKCS8 } = require("jose");
+const { SignJWT, importJWK } = require("jose");
 
 const app = express();
 app.use(express.json());
@@ -18,7 +18,7 @@ const CONFIG = {
 };
 
 // ============================================================
-// YOUR JWK KEY (FIXED INPUT)
+// JWK KEY (YOUR KEY)
 // ============================================================
 const JWK_KEY = {
   kty: "RSA",
@@ -30,45 +30,26 @@ const JWK_KEY = {
 };
 
 // ============================================================
-// PEM CACHE (IMPORTANT)
+// JWT (FIXED - ONLY JOSE)
 // ============================================================
-let PRIVATE_KEY_PEM = null;
-
-// convert JWK → PEM once
-async function getPrivateKey() {
-  if (PRIVATE_KEY_PEM) return PRIVATE_KEY_PEM;
-
-  const key = await importJWK(JWK_KEY, "PS384");
-  PRIVATE_KEY_PEM = await exportPKCS8(key);
-
-  return PRIVATE_KEY_PEM;
-}
-
-// ============================================================
-// JWT GENERATION (FIXED)
-// ============================================================
-const jwt = require("jsonwebtoken");
-
 async function generateJWT() {
-  const privateKey = await getPrivateKey();
+  const key = await importJWK(JWK_KEY, "PS384");
 
   const now = Math.floor(Date.now() / 1000);
 
-  return jwt.sign(
-    {
-      iss: CONFIG.CLIENT_ID,
-      sub: CONFIG.CLIENT_ID,
-      aud: CONFIG.TOKEN_URL,
-      iat: now,
-      exp: now + 300,
-      jti: `jwt-${Date.now()}`,
-    },
-    privateKey,
-    {
-      algorithm: "PS384",
-      keyid: CONFIG.KEY_ID,
-    }
-  );
+  return await new SignJWT({
+    iss: CONFIG.CLIENT_ID,
+    sub: CONFIG.CLIENT_ID,
+    aud: CONFIG.TOKEN_URL,
+    iat: now,
+    exp: now + 300,
+    jti: `jwt-${Date.now()}`,
+  })
+    .setProtectedHeader({
+      alg: "PS384",
+      kid: CONFIG.KEY_ID,
+    })
+    .sign(key);
 }
 
 // ============================================================
@@ -129,7 +110,7 @@ async function sendToGHL(type, data) {
       timestamp: new Date().toISOString(),
     });
 
-    console.log(`✅ SENT ${type}: ${data.length}`);
+    console.log(`✅ SENT: ${type} (${data.length})`);
   } catch (err) {
     console.error("GHL ERROR:", err.message);
   }
@@ -187,11 +168,11 @@ app.get("/sync", async (req, res) => {
 setInterval(runSync, 900000);
 
 // ============================================================
-// START SERVER
+// START
 // ============================================================
 const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+  console.log(`🚀 Server running on ${PORT}`);
   runSync();
 });
