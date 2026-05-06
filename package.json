@@ -1,0 +1,14 @@
+{
+  "name": "ecw-ghl-sync",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "node-jose": "^2.2.0",
+    "jsonwebtoken": "^9.0.0"
+  }
+}
