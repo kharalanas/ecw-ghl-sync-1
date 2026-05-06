@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
-const { SignJWT, importJWK } = require("jose");
+const fs = require("fs");
+const { SignJWT, importPKCS8 } = require("jose");
 
 const app = express();
 app.use(express.json());
@@ -11,29 +12,16 @@ const CONFIG = {
   TOKEN_URL: "http://pit-c3ffa7a8-97ee-45ab-812c-189cbeed73f0/oauth2/token",
   FHIR_BASE: "http://pit-c3ffa7a8-97ee-45ab-812c-189cbeed73f0/fhir/r4",
   GHL_WEBHOOK:
-    "https://services.leadconnectorhq.com/hooks/your-webhook",
+    "https://services.leadconnectorhq.com/hooks/YOUR_WEBHOOK",
   KEY_ID: "totalflow-key-1",
 };
 
-// ================= JWK KEY =================
-const JWK_KEY = {
-  kty: "RSA",
-  e: "AQAB",
-  use: "sig",
-  kid: "totalflow-key-1",
-  alg: "PS384",
-  n: "REPLACE_WITH_YOUR_N_VALUE",
-  d: "REPLACE_WITH_YOUR_D_VALUE",
-  p: "REPLACE",
-  q: "REPLACE",
-  dp: "REPLACE",
-  dq: "REPLACE",
-  qi: "REPLACE",
-};
+// ================= PRIVATE KEY (PEM FILE) =================
+const PRIVATE_KEY = fs.readFileSync("./private.key", "utf8");
 
-// ================= JWT =================
+// ================= JWT GENERATION (FIXED) =================
 async function generateJWT() {
-  const key = await importJWK(JWK_KEY, "PS384");
+  const key = await importPKCS8(PRIVATE_KEY, "RS256");
 
   const now = Math.floor(Date.now() / 1000);
 
@@ -46,13 +34,13 @@ async function generateJWT() {
     jti: `jwt-${Date.now()}`,
   })
     .setProtectedHeader({
-      alg: "PS384",
+      alg: "RS256",
       kid: CONFIG.KEY_ID,
     })
     .sign(key);
 }
 
-// ================= TOKEN =================
+// ================= ACCESS TOKEN =================
 async function getAccessToken() {
   try {
     const jwt = await generateJWT();
@@ -64,8 +52,6 @@ async function getAccessToken() {
         client_assertion_type:
           "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
         client_assertion: jwt,
-        scope:
-          "system/Patient.read system/Encounter.read system/Observation.read",
       }).toString(),
       {
         headers: {
@@ -82,7 +68,7 @@ async function getAccessToken() {
   }
 }
 
-// ================= FHIR =================
+// ================= FHIR FETCH =================
 async function fetchFHIR(token, resource) {
   try {
     const res = await axios.get(
@@ -101,7 +87,7 @@ async function fetchFHIR(token, resource) {
   }
 }
 
-// ================= GHL =================
+// ================= GHL SEND =================
 async function sendToGHL(type, data) {
   if (!data.length) return;
 
@@ -135,7 +121,7 @@ async function runSync() {
     await sendToGHL("Patients", patients);
     await sendToGHL("Appointments", encounters);
 
-    console.log("✅ SYNC DONE");
+    console.log("✅ SYNC COMPLETE");
   } catch (err) {
     console.log("❌ SYNC ERROR:", err.message);
   } finally {
