@@ -18,7 +18,7 @@ const CONFIG = {
 };
 
 // ============================================================
-// JWK KEY (YOUR KEY)
+// FULL PRIVATE JWK KEY
 // ============================================================
 const JWK_KEY = {
   kty: "RSA",
@@ -27,10 +27,16 @@ const JWK_KEY = {
   kid: "totalflow-key-1",
   alg: "PS384",
   n: "kGHFqDXt-EXPRQAt5cKbjF9N7TULdHxqtoko_-EtnmODcrKu66nT-8lz5Cy23RGk_Is6SsT_skY-Fz8ycvwf10pTfYAX2R7BoHPvwbeHwpTBJaFiSiSKLR9-5Ro5iIdtOOeWjsqs1ffgwFaDjSH12tqYV-zzJzOvBopH-APrgCwNbuRsJhvcn1orGMnRmYZINnXeLT-2qV-vk2txeQFp9otUp7D8qrlEPjr3RlDKHyTk4DHrYVwymyFNZKDh28LfSnDHjC_efkRhYpZeSzk3jhGb6GhOCt3r73Yt9UtfePR6qT6YkZYm4eaNID_n5suA0bWVmhDZrG_k_x8EwtPvvw",
+  d: "C5BBFTFIigoGnoH0AG2p0-rCzNI4RM_oI2QbLASGs6Odtf8jQk2bjulksOwh3dUZb9PeIHnkTrdl0VUm6bhRUTFV5tHDrIh-59ERQo8RPkoiqVcNDl9xz55bpTwIn-t_bxTL5Ut3NJCB6CBQWz_SjIDVvbOvtRPkcIjSWHCb7mu5_qz2d9AUKmtaazEsBFPfyn5R62ypUjsmDPlXTKo2Rk0V6tzJdib_-x2lZ76vbm8e8d4KjSTFPK3qyRxRNkzwSqrqyeIBGj4W3BfQgEKT4oJ05TZPjGimPDtU3IB2YTKho8ZRkU4pZ8vApSUv_Mim3jSs4NYHGkxv9fo2ImtfzQ",
+  p: "u_fE5Bpqi7is15eeR9zf1OQFQP3tF4kWI9FdB0ykrucNNc0GtIWyGeUlVHiRHIlogVSpGAH3IW3aIfS2UVsIwJvhi1fDtYXU0hlPSBM5VIyvrNn--mOKETcj-QA6CQOx5_08Jh7-6jXQIOApTPq1XofCwYCrvI9rob9WPaqq-YM",
+  q: "xKOIZu6KXz2IQjh2NQCezbqQdW5oBVWrp6JA7hIdIk27xl3ewOzX-rtlYvDs_MtNVMJleCquHkRET1-KNM_93FZu6LtasSXub-A2c2ESDCpTrjiQvy_THqyjBM1mUmbvw8Y-Qh2so1EHgFNHyTeSXfHjIsb3Kqwppo37pGkbKBU",
+  dp: "P-hLruo0U3DkgyBvlitIhs9H4gLze08GkgL6yCKM01KHMUWWBAZ4uUkpWgDsBXHKcD5ih2ETru_0fBsBacOzxBi7pG6ggbUQ2KX2SKEQmuiCShiMEoGJTbUbq-sh0DLLZ_63VpavQN4u9x5_rEaJJ6ys0LF4slFo3MN7BNhj7RU",
+  dq: "NAPuOQwwnjDwslOtMSgQ2erX-7hQ29hlp9pLwq4X9tMJMNfz7KS6HSElGJ8SkWxV8G3b2YWwuWDlkPl83auHQ5m5jObCfsnB4OY2gR7UX1Ny_0sHPwuvlRWlqceLoZCJLAhsv6CJ4km06kUdYCTLGv65TqHDEA6qldxJDJyhCmE",
+  qi: "rMqRVMfjol49oJwSk1FPGMuZniwgogiG55V4ttPyahTjllj92c62MD_TzJaYDDhjEvPtb4m_B8Gn7kO6z7KRIWFK8MfNV85N3GE_oCVSVAmt0evAvOjchiHf4i2eLNqMGC54SS2dTuI5FMz9alRnuMSt1AQIStSL9OvYjqZZKSY",
 };
 
 // ============================================================
-// JWT (FIXED - ONLY JOSE)
+// JWT GENERATION (FIXED - NO KEY ERROR)
 // ============================================================
 async function generateJWT() {
   const key = await importJWK(JWK_KEY, "PS384");
@@ -117,7 +123,7 @@ async function sendToGHL(type, data) {
 }
 
 // ============================================================
-// SYNC (SAFE)
+// SYNC ENGINE (SAFE)
 // ============================================================
 let running = false;
 
@@ -154,12 +160,8 @@ app.get("/", (req, res) => {
 });
 
 app.get("/sync", async (req, res) => {
-  try {
-    await runSync();
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: "failed" });
-  }
+  await runSync();
+  res.json({ success: true });
 });
 
 // ============================================================
@@ -168,7 +170,7 @@ app.get("/sync", async (req, res) => {
 setInterval(runSync, 900000);
 
 // ============================================================
-// START
+// START SERVER
 // ============================================================
 const PORT = process.env.PORT || 8080;
 
