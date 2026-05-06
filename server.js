@@ -1,6 +1,6 @@
 /**
  * ECW FHIR → GoHighLevel Sync Server
- * Deploy on Render.com (Free)
+ * Deploy on Railway.app
  */
 
 const express = require("express");
@@ -16,7 +16,7 @@ app.use(express.json());
 // ============================================================
 const CONFIG = {
   CLIENT_ID: "mNthIYkJe0qV65nnUdhUkWVQrHENLixq1uu8kEpZdQE",
-  TOKEN_URL: "https://staging-fhir.ecwcloud.com/fhir/r4/FFBJCD/oauth2/token",
+  TOKEN_URL: "https://staging-fhir.ecwcloud.com/oauth2/token",
   FHIR_BASE: "https://staging-fhir.ecwcloud.com/fhir/r4/FFBJCD",
   GHL_WEBHOOK: "https://services.leadconnectorhq.com/hooks/bxce7bnn4u01mHjoq1sm/webhook-trigger/fe032fe5-cc42-4030-bb65-bfd48fe54e2b",
   KEY_ID: "totalflow-key-1",
@@ -137,13 +137,10 @@ async function runSync() {
 // ============================================================
 // EXPRESS ROUTES
 // ============================================================
-
-// Health check
 app.get("/", (req, res) => {
   res.json({ status: "running", message: "ECW to GHL Sync Server" });
 });
 
-// Manual sync trigger
 app.get("/sync", async (req, res) => {
   const result = await runSync();
   res.json(result);
