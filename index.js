@@ -1,17 +1,16 @@
 /**
- * ECW FHIR → GoHighLevel Sync Server (FIXED)
+ * ECW FHIR → GoHighLevel Sync Server (FIXED + PRODUCTION READY)
  */
 
 const express = require("express");
 const axios = require("axios");
-const jose = require("node-jose");
-const jwt = require("jsonwebtoken");
+const { SignJWT, importJWK } = require("jose");
 
 const app = express();
 app.use(express.json());
 
 // ============================================================
-// CONFIGURATION
+// CONFIG
 // ============================================================
 const CONFIG = {
   CLIENT_ID: "mNthIYkJe0qV65nnUdhUkWVQrHENLixq1uu8kEpZdQE",
@@ -23,32 +22,41 @@ const CONFIG = {
 };
 
 // ============================================================
-// PRIVATE KEY (UNCHANGED)
+// PRIVATE KEY
 // ============================================================
-const PRIVATE_KEY_JWK = { /* same as yours */ };
+const PRIVATE_KEY_JWK = {
+  p: "u_fE5Bpqi7is15eeR9zf1OQFQP3tF4kWI9FdB0ykrucNNc0GtIWyGeUlVHiRHIlogVSpGAH3IW3aIfS2UVsIwJvhi1fDtYXU0hlPSBM5VIyvrNn--mOKETcj-QA6CQOx5_08Jh7-6jXQIOApTPq1XofCwYCrvI9rob9WPaqq-YM",
+  kty: "RSA",
+  q: "xKOIZu6KXz2IQjh2NQCezbqQdW5oBVWrp6JA7hIdIk27xl3ewOzX-rtlYvDs_MtNVMJleCquHkRET1-KNM_93FZu6LtasSXub-A2c2ESDCpTrjiQvy_THqyjBM1mUmbvw8Y-Qh2so1EHgFNHyTeSXfHjIsb3Kqwppo37pGkbKBU",
+  d: "C5BBFTFIigoGnoH0AG2p0-rCzNI4RM_oI2QbLASGs6Odtf8jQk2bjulksOwh3dUZb9PeIHnkTrdl0VUm6bhRUTFV5tHDrIh-59ERQo8RPkoiqVcNDl9xz55bpTwIn-t_bxTL5Ut3NJCB6CBQWz_SjIDVvbOvtRPkcIjSWHCb7mu5_qz2d9AUKmtaazEsBFPfyn5R62ypUjsmDPlXTKo2Rk0V6tzJdib_-x2lZ76vbm8e8d4KjSTFPK3qyRxRNkzwSqrqyeIBGj4W3BfQgEKT4oJ05TZPjGimPDtU3IB2YTKho8ZRkU4pZ8vApSUv_Mim3jSs4NYHGkxv9fo2ImtfzQ",
+  e: "AQAB",
+  use: "sig",
+  kid: "totalflow-key-1",
+  alg: "PS384",
+  n: "kGHFqDXt-EXPRQAt5cKbjF9N7TULdHxqtoko_-EtnmODcrKu66nT-8lz5Cy23RGk_Is6SsT_skY-Fz8ycvwf10pTfYAX2R7BoHPvwbeHwpTBJaFiSiSKLR9-5Ro5iIdtOOeWjsqs1ffgwFaDjSH12tqYV-zzJzOvBopH-APrgCwNbuRsJhvcn1orGMnRmYZINnXeLT-2qV-vk2txeQFp9otUp7D8qrlEPjr3RlDKHyTk4DHrYVwymyFNZKDh28LfSnDHjC_efkRhYpZeSzk3jhGb6GhOCt3r73Yt9UtfePR6qT6YkZYm4eaNID_n5suA0bWVmhDZrG_k_x8EwtPvvw",
+};
 
 // ============================================================
-// JWT GENERATE
+// JWT GENERATION (FIXED)
 // ============================================================
 async function generateJWT() {
-  const keystore = jose.JWK.createKeyStore();
-  const key = await keystore.add(PRIVATE_KEY_JWK, "json");
-  const privatePem = key.toPEM(true);
+  const key = await importJWK(PRIVATE_KEY_JWK, "PS384");
 
   const now = Math.floor(Date.now() / 1000);
 
-  return jwt.sign(
-    {
-      iss: CONFIG.CLIENT_ID,
-      sub: CONFIG.CLIENT_ID,
-      aud: CONFIG.TOKEN_URL,
-      iat: now,
-      exp: now + 300,
-      jti: `jwt-${Date.now()}`,
-    },
-    privatePem,
-    { algorithm: "PS384", keyid: CONFIG.KEY_ID }
-  );
+  return await new SignJWT({
+    iss: CONFIG.CLIENT_ID,
+    sub: CONFIG.CLIENT_ID,
+    aud: CONFIG.TOKEN_URL,
+    iat: now,
+    exp: now + 300,
+    jti: `jwt-${Date.now()}`,
+  })
+    .setProtectedHeader({
+      alg: "PS384",
+      kid: CONFIG.KEY_ID,
+    })
+    .sign(key);
 }
 
 // ============================================================
@@ -62,8 +70,6 @@ async function getAccessToken() {
     client_assertion_type:
       "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
     client_assertion: clientAssertion,
-    scope:
-      "system/Patient.read system/Encounter.read system/MedicationRequest.read system/Observation.read",
   });
 
   const res = await axios.post(CONFIG.TOKEN_URL, params.toString(), {
@@ -75,7 +81,7 @@ async function getAccessToken() {
 }
 
 // ============================================================
-// FETCH FHIR DATA (SAFE)
+// FETCH FHIR
 // ============================================================
 async function fetchFHIR(token, resource, query = "") {
   try {
@@ -93,115 +99,90 @@ async function fetchFHIR(token, resource, query = "") {
 
     return (res.data.entry || []).map((e) => e.resource);
   } catch (err) {
-    console.error(`❌ FHIR ERROR (${resource}):`, err.message);
+    console.error("❌ FHIR ERROR:", err.message);
     return [];
   }
 }
 
 // ============================================================
-// CLEAN DATA (IMPORTANT FIX)
+// CLEAN DATA
 // ============================================================
-function cleanData(type, records) {
+function clean(type, records) {
   if (!records?.length) return [];
 
-  switch (type) {
-    case "Patients":
-      return records.map((p) => ({
-        id: p.id,
-        firstName: p.name?.[0]?.given?.[0] || "",
-        lastName: p.name?.[0]?.family || "",
-        gender: p.gender || "",
-        birthDate: p.birthDate || "",
-      }));
-
-    case "Appointments":
-      return records.map((e) => ({
-        id: e.id,
-        status: e.status,
-        date: e.period?.start,
-      }));
-
-    case "Medications":
-      return records.map((m) => ({
-        id: m.id,
-        status: m.status,
-      }));
-
-    case "LabResults":
-      return records.map((o) => ({
-        id: o.id,
-        type: o.code?.text,
-        value: o.valueQuantity?.value,
-      }));
-
-    default:
-      return records;
+  if (type === "Patients") {
+    return records.map((p) => ({
+      id: p.id,
+      firstName: p.name?.[0]?.given?.[0] || "",
+      lastName: p.name?.[0]?.family || "",
+    }));
   }
+
+  if (type === "Appointments") {
+    return records.map((e) => ({
+      id: e.id,
+      status: e.status,
+      date: e.period?.start,
+    }));
+  }
+
+  return records;
 }
 
 // ============================================================
-// SEND TO GHL (FIXED)
+// SEND TO GHL (SAFE)
 // ============================================================
-async function sendToGHL(dataType, records) {
+async function sendToGHL(type, records) {
   if (!records.length) return;
 
   try {
-    const cleaned = cleanData(dataType, records);
+    const cleaned = clean(type, records);
 
-    const res = await axios.post(
+    await axios.post(
       CONFIG.GHL_WEBHOOK,
       {
         source: "ECW_FHIR",
-        dataType,
-        timestamp: new Date().toISOString(),
+        type,
         count: cleaned.length,
         data: cleaned,
+        timestamp: new Date().toISOString(),
       },
       { timeout: 20000 }
     );
 
-    console.log(`✅ GHL SENT: ${dataType} (${cleaned.length})`);
+    console.log(`✅ SENT: ${type} (${cleaned.length})`);
   } catch (err) {
-    console.error(
-      "❌ GHL ERROR:",
-      err.response?.data || err.message
-    );
+    console.error("❌ GHL ERROR:", err.message);
   }
 }
 
 // ============================================================
-// SYNC CONTROL (STOP OVERLAP)
+// SYNC CONTROL
 // ============================================================
-let isRunning = false;
+let running = false;
 
 async function runSync() {
-  if (isRunning) return;
-  isRunning = true;
+  if (running) return;
+  running = true;
 
-  console.log("🔄 Sync started:", new Date().toLocaleString());
+  console.log("🔄 Sync started");
 
   try {
     const token = await getAccessToken();
-    const today = new Date().toISOString().split("T")[0];
 
-    const [patients, encounters, medications, observations] =
-      await Promise.all([
-        fetchFHIR(token, "Patient", "_count=50"),
-        fetchFHIR(token, "Encounter", `_count=50&date=ge${today}`),
-        fetchFHIR(token, "MedicationRequest", "_count=50"),
-        fetchFHIR(token, "Observation", "_count=50"),
-      ]);
+    const [patients, encounters] = await Promise.all([
+      fetchFHIR(token, "Patient", "_count=50"),
+      fetchFHIR(token, "Encounter", "_count=50"),
+    ]);
 
     await sendToGHL("Patients", patients);
     await sendToGHL("Appointments", encounters);
-    await sendToGHL("Medications", medications);
-    await sendToGHL("LabResults", observations);
 
     console.log("✅ SYNC COMPLETE");
   } catch (err) {
     console.error("❌ SYNC ERROR:", err.message);
   } finally {
-    isRunning = false;
+    running = false;
   }
 }
 
@@ -213,16 +194,16 @@ app.get("/", (req, res) => {
 });
 
 app.get("/sync", async (req, res) => {
-  const result = await runSync();
+  await runSync();
   res.json({ success: true });
 });
 
-// Auto sync every 15 min
+// Auto sync
 setInterval(runSync, 900000);
 
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on ${PORT}`);
+  console.log("🚀 Server running on", PORT);
   runSync();
 });
